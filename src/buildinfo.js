@@ -11,6 +11,6 @@ const BUNDLED = typeof __BUNDLED__ !== 'undefined' && __BUNDLED__ === true;
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
 
 /** 可执行脚本的名字，帮助文本与下载文件名都用它。 */
-const NAME = 'wsfwd';
+const NAME = 'wspunch';
 
 module.exports = { BUNDLED, VERSION, NAME };

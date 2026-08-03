@@ -5,7 +5,7 @@
   "private": true,
   "main": "src/cli.js",
   "bin": {
-    "wsfwd": "dist/wsfwd.js"
+    "wspunch": "dist/wspunch.js"
   },
   "scripts": {
     "build": "node build.js",

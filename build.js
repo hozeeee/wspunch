@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * 把 src/ 和 node_modules 里的依赖打成一个可执行的单文件：dist/wsfwd.js
+ * 把 src/ 和 node_modules 里的依赖打成一个可执行的单文件：dist/wspunch.js
  *
  *   node build.js            构建
  *   node build.js --minify   顺手压缩（默认不压，方便对端 review 拿到的代码）
@@ -20,7 +20,7 @@ const esbuild = require('esbuild');
 
 const pkg = require('./package.json');
 const OUT_DIR = path.join(__dirname, 'dist');
-const OUT_FILE = path.join(OUT_DIR, 'wsfwd.js');
+const OUT_FILE = path.join(OUT_DIR, 'wspunch.js');
 
 async function main() {
   const minify = process.argv.includes('--minify');
@@ -42,7 +42,7 @@ async function main() {
     },
     // src/cli.js 的 shebang 会被 esbuild 原样提到产物最前面，这里只补一行出处说明
     banner: {
-      js: `// wsfwd ${pkg.version} —— 单文件构建产物，源码见项目的 src/ 目录\n`,
+      js: `// wspunch ${pkg.version} —— 单文件构建产物，源码见项目的 src/ 目录\n`,
     },
   });
 

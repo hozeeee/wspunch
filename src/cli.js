@@ -4,8 +4,8 @@
 /**
  * 命令行入口：解析 `子命令 + 选项`，然后把归一化后的配置交给对应模式。
  *
- *   wsfwd access --port 8080 --map 5000:127.0.0.1:22 --token xxx
- *   wsfwd expose --url ws://1.2.3.4:8080/tunnel --token xxx
+ *   wspunch access --port 8080 --map 5000:127.0.0.1:22 --token xxx
+ *   wspunch expose --url ws://1.2.3.4:8080/tunnel --token xxx
  */
 
 const { parseArgs } = require('node:util');

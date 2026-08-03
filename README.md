@@ -7,7 +7,7 @@
             │  TCP
             ▼
     ┌────────────────┐                       ┌────────────────┐
-    │  wsfwd access  │   单条 WebSocket      │  wsfwd expose  │
+    │  wspunch access  │   单条 WebSocket      │  wspunch expose  │
     │                │ ◄════ 多路复用 ════►  │                │
     │  WS + HTTP 服务 │   (ws:// 或 wss://)   │  只出网，不监听  │
     │  监听 5000 端口 │                       └───────┬────────┘
@@ -29,7 +29,7 @@
 
 ```bash
 npm install
-npm run build         # -> dist/wsfwd.js，已 chmod +x，约 165 KB
+npm run build         # -> dist/wspunch.js，已 chmod +x，约 165 KB
 npm run build:min     # 顺手压缩（默认不压，方便对端 review 拿到的代码）
 ```
 
@@ -47,10 +47,10 @@ npm run access -- --port 8080 --map 5000:127.0.0.1:9000    # 等价
 node examples/origin-server.js 9000
 
 # 终端2：access 端 —— 服务在 8080，本地 5000 端口转发到目标 127.0.0.1:9000
-./dist/wsfwd.js access --port 8080 --map 5000:127.0.0.1:9000 --token s3cret
+./dist/wspunch.js access --port 8080 --map 5000:127.0.0.1:9000 --token s3cret
 
 # 终端3：expose 端
-./dist/wsfwd.js expose --url ws://127.0.0.1:8080/tunnel --token s3cret
+./dist/wspunch.js expose --url ws://127.0.0.1:8080/tunnel --token s3cret
 ```
 
 然后：
@@ -67,7 +67,7 @@ curl -o /dev/null "http://127.0.0.1:5000/big?mb=32"
 先在 `1.2.3.4` 上起 access 端：
 
 ```bash
-./wsfwd access \
+./wspunch access \
   --port 8080 \
   --listen-host 0.0.0.0 \
   --map 2222:10.0.0.9:22 \
@@ -78,9 +78,9 @@ curl -o /dev/null "http://127.0.0.1:5000/big?mb=32"
 再在内网机器上，直接从 access 端把脚本拉下来跑 —— 不需要 git、不需要 npm install：
 
 ```bash
-curl -fsSL 'http://1.2.3.4:8080/download?token=一串够长的随机口令' -o wsfwd
-chmod +x wsfwd
-./wsfwd expose --url ws://1.2.3.4:8080/tunnel --token 一串够长的随机口令
+curl -fsSL 'http://1.2.3.4:8080/download?token=一串够长的随机口令' -o wspunch
+chmod +x wspunch
+./wspunch expose --url ws://1.2.3.4:8080/tunnel --token 一串够长的随机口令
 ```
 
 忘了命令怎么写就 `curl -fsSL 'http://1.2.3.4:8080/?token=...'`，说明页里的引导命令会自动填好这台机器的真实地址与路径。
@@ -89,7 +89,7 @@ chmod +x wsfwd
 
 ## 参数
 
-### `wsfwd access`
+### `wspunch access`
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ chmod +x wsfwd
 | `--compress` | 关 | 开启 permessage-deflate |
 | `--verbose` | 关 | 打印调试日志 |
 
-### `wsfwd expose`
+### `wspunch expose`
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ chmod +x wsfwd
 
 「跟随 token」= 设了 `--token` 就必须带 `?token=…` 或请求头 `x-tunnel-token`，`--public-http` 可放开。说明页里只写 `--token 你的口令` 占位符，不会回显真实口令。
 
-`/download` 吐出去的就是当前正在运行的这个文件本身，所以两端永远版本一致。如果你跑的是源码（`node src/cli.js`），它会退回去发 `dist/wsfwd.js`；连它也没有就返回 501 并提示先 `npm run build`。
+`/download` 吐出去的就是当前正在运行的这个文件本身，所以两端永远版本一致。如果你跑的是源码（`node src/cli.js`），它会退回去发 `dist/wspunch.js`；连它也没有就返回 501 并提示先 `npm run build`。
 
 ## 实现要点
 
@@ -148,8 +148,8 @@ chmod +x wsfwd
 - **zsh 下 IPv6 地址要加引号**：参数里含 IPv6 方括号时（如 `--url ws://[240e::1]:8080/tunnel` 或 `--map 5000:[::1]:22`），zsh 会把 `[...]` 当成通配符去匹配文件，匹配不到就报 `zsh: no matches found` 且命令不会执行。给参数整体加单引号即可：
 
   ```bash
-  ./wsfwd expose --url 'ws://[240e::1]:8080/tunnel' --token xxxx
-  ./wsfwd access --port 8080 --map '5000:[::1]:22'
+  ./wspunch expose --url 'ws://[240e::1]:8080/tunnel' --token xxxx
+  ./wspunch access --port 8080 --map '5000:[::1]:22'
   ```
 
   或在 `~/.zshrc` 里加 `setopt no_nomatch`，让匹配失败时原样传参（bash 默认就是这个行为，无此问题）。
