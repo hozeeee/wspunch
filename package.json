@@ -1,0 +1,25 @@
+{
+  "name": "ws-port-forward",
+  "version": "2.0.0",
+  "description": "以 WebSocket 作为信道的 TCP 端口转发：单文件可执行脚本，access / expose 两种模式",
+  "private": true,
+  "main": "src/cli.js",
+  "bin": {
+    "wsfwd": "dist/wsfwd.js"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "build:min": "node build.js --minify",
+    "access": "node src/cli.js access",
+    "expose": "node src/cli.js expose"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}
