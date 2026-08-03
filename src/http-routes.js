@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * access 端的 HTTP 路由。与 WS 服务共用同一个端口、同一个 http.Server，
- * 所以对外只需要放开一个端口。
+ * 监听端（给了 --port 的那一端，可能是 expose 也可能是 access）的 HTTP 路由。
+ * 与 WS 服务共用同一个端口、同一个 http.Server，所以对外只需要放开一个端口。
  *
- *   GET /                 使用说明，引导命令里会填好本机真实地址
- *   GET /download         下发这个脚本本身，给对端拿去跑 expose 模式
+ *   GET /                 使用说明，引导命令里会填好本机真实地址与当前配置
+ *   GET /download         下发这个脚本本身，给对端拿去跑另一个模式
  *   GET /download.sha256  上面那个文件的校验和
  *   GET /healthz          探活，永不鉴权（挂在网关后面用）
  *
@@ -45,7 +45,7 @@ function sha256Of(file) {
 }
 
 function createHttpHandler({ opts, getState, log }) {
-  const authRequired = Boolean(opts.token) && !opts.publicHttp;
+  const authRequired = Boolean(opts.token) && !opts.transport.publicHttp;
 
   const authorized = (req, url) => {
     if (!authRequired) return true;
@@ -83,11 +83,12 @@ function createHttpHandler({ opts, getState, log }) {
       const proto = String(req.headers['x-forwarded-proto'] || 'http').split(',')[0].trim();
       const authority = req.headers.host || opts.publicAuthority;
       const body = httpUsage({
+        role: opts.role,
         httpBase: `${proto}://${authority}`,
-        wsUrl: `${proto === 'https' ? 'wss' : 'ws'}://${authority}${opts.path}`,
+        wsUrl: `${proto === 'https' ? 'wss' : 'ws'}://${authority}${opts.transport.path}`,
         hasToken: Boolean(opts.token),
         tokenInUrl: authRequired,
-        mappings: opts.mappings,
+        opts,
       });
       res.writeHead(200, TEXT).end(head ? undefined : body);
       return;

@@ -43,17 +43,36 @@ function formatHostPort(host, port) {
   return `${bare ? `[${text}]` : text}:${port}`;
 }
 
-/** 解析 access 模式的 --map 参数：`5000:127.0.0.1:22`、`5000:example.com:443` 或 `5000:[::1]:22`。 */
+/** 解析 expose 端的 --expose 参数：`web=127.0.0.1:9000`。 */
+function parseService(input) {
+  const text = String(input).trim();
+  const idx = text.indexOf('=');
+  if (idx <= 0) throw new Error(`服务声明格式应为 服务名=目标host:目标端口，收到 "${text}"`);
+  const name = text.slice(0, idx).trim();
+  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(name)) {
+    throw new Error(`服务名只能用字母、数字与 _ . - （最长 64），收到 "${name}"`);
+  }
+  const { host, port } = parseHostPort(text.slice(idx + 1));
+  return { name, host, port, target: formatHostPort(host, port) };
+}
+
+/** 解析 access 端的 --map 参数：`5000=web`，也接受 `5000:web`。 */
 function parseMapping(input) {
   const text = String(input).trim();
-  const idx = text.indexOf(':');
-  if (idx <= 0) throw new Error(`映射格式应为 本地端口:目标host:目标port，收到 "${text}"`);
-  const listenPort = Number(text.slice(0, idx));
+  const m = /^(\d+)\s*[=:]\s*(.+)$/.exec(text);
+  if (!m) throw new Error(`映射格式应为 本地端口=服务名，收到 "${text}"`);
+  const listenPort = Number(m[1]);
   if (!Number.isInteger(listenPort) || listenPort < 1 || listenPort > 65535) {
     throw new Error(`监听端口不合法："${text}"`);
   }
-  const { host, port } = parseHostPort(text.slice(idx + 1));
-  return { listenPort, targetHost: host, targetPort: port, target: formatHostPort(host, port) };
+  const service = m[2].trim();
+  if (service.includes(':')) {
+    throw new Error(
+      `--map 现在填的是 expose 端声明的服务名而不是地址（收到 "${text}"），` +
+        '目标改由 expose 端的 --expose 服务名=host:port 声明',
+    );
+  }
+  return { listenPort, service };
 }
 
 function formatBytes(n) {
@@ -71,4 +90,12 @@ function safeEqual(a, b) {
   return require('node:crypto').timingSafeEqual(x, y);
 }
 
-module.exports = { createLogger, parseHostPort, formatHostPort, parseMapping, formatBytes, safeEqual };
+module.exports = {
+  createLogger,
+  parseHostPort,
+  formatHostPort,
+  parseService,
+  parseMapping,
+  formatBytes,
+  safeEqual,
+};

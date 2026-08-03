@@ -23,8 +23,10 @@ const NOOP_LOG = { debug() {}, info() {}, warn() {}, error() {} };
 /**
  * 挂在一条 WebSocket 上的流复用器，两种模式共用同一份实现。
  *
- * - 发起方（access 端）调用 open(socket, target) 建流；
- * - 响应方（expose 端）通过 onOpen(target) 回调去 connect 真实目标，返回 socket。
+ * - 发起方（access 端）调用 open(socket, service) 按服务名建流；
+ * - 响应方（expose 端）通过 onOpen(service) 回调把服务名解成真实目标并 connect，
+ *   返回 { socket, label }（label 仅用于日志）；
+ * - expose 端另用 sendServices() 下发服务清单，access 端收到后 emit 'services'。
  *
  * 内部负责：TCP <-> 帧 的双向搬运、半关闭语义、双向背压、流清理。
  */
@@ -56,13 +58,18 @@ class Tunnel extends EventEmitter {
 
   // ---------------------------------------------------------------- 发起方 API
 
-  /** 把一条已建立的本地 TCP 连接接入隧道，请求对端连到 target（"host:port"）。 */
-  open(socket, target) {
+  /** 把一条已建立的本地 TCP 连接接入隧道，请对端连到名为 service 的服务。 */
+  open(socket, service) {
     const streamId = this._allocId();
-    const st = this._createStream(streamId, target);
-    this._send(TYPE.OPEN, streamId, target);
+    const st = this._createStream(streamId, service);
+    this._send(TYPE.OPEN, streamId, service);
     this._attachSocket(st, socket);
     return streamId;
+  }
+
+  /** 响应方 API：把自己能提供的服务清单告诉对端。 */
+  sendServices(list) {
+    return this._send(TYPE.SERVICES, 0, JSON.stringify(list));
   }
 
   _allocId() {
@@ -85,6 +92,10 @@ class Tunnel extends EventEmitter {
 
     if (type === TYPE.OPEN) {
       this._onOpenFrame(streamId, payload.toString('utf8'));
+      return;
+    }
+    if (type === TYPE.SERVICES) {
+      this._onServicesFrame(payload);
       return;
     }
     if (!st) {
@@ -126,7 +137,7 @@ class Tunnel extends EventEmitter {
     }
   }
 
-  _onOpenFrame(streamId, target) {
+  _onOpenFrame(streamId, service) {
     if (typeof this.onOpen !== 'function') {
       this._send(TYPE.RESET, streamId, '本端不接受建流请求');
       return;
@@ -135,25 +146,44 @@ class Tunnel extends EventEmitter {
       this._send(TYPE.RESET, streamId, `流 #${streamId} 已存在`);
       return;
     }
-    const st = this._createStream(streamId, target);
-    this.log.debug(`收到建流请求 #${streamId} -> ${target}`);
+    const st = this._createStream(streamId, service);
+    this.log.debug(`收到建流请求 #${streamId} -> ${service}`);
 
     Promise.resolve()
-      .then(() => this.onOpen(target, st))
-      .then((socket) => {
+      .then(() => this.onOpen(service, st))
+      .then(({ socket, label }) => {
+        if (label) st.target = label;
         if (st.closed) {
           socket.destroy();
           return;
         }
         this._attachSocket(st, socket);
-        this.log.info(`流 #${streamId} 已连通 ${target}`);
+        this.log.info(`流 #${streamId} 已连通 ${st.target}`);
       })
       .catch((err) => {
-        this.log.warn(`流 #${streamId} 连接 ${target} 失败：${err.message}`);
+        this.log.warn(`流 #${streamId} 连接服务 ${service} 失败：${err.message}`);
         this._send(TYPE.RESET, streamId, err.message);
         this.streams.delete(streamId);
         st.closed = true;
       });
+  }
+
+  _onServicesFrame(payload) {
+    let list;
+    try {
+      list = JSON.parse(payload.toString('utf8'));
+    } catch {
+      this.log.warn('对端发来的服务清单无法解析');
+      return;
+    }
+    if (!Array.isArray(list)) {
+      this.log.warn('对端发来的服务清单不是数组');
+      return;
+    }
+    this.emit(
+      'services',
+      list.filter((s) => s && typeof s.name === 'string'),
+    );
   }
 
   // -------------------------------------------------------------- 流生命周期
@@ -161,7 +191,7 @@ class Tunnel extends EventEmitter {
   _createStream(streamId, target) {
     const st = {
       id: streamId,
-      target,
+      target, // 日志用的标签：access 侧是服务名，expose 侧连上后换成 服务名 -> 真实地址
       socket: null,
       pending: [], // socket 就绪前收到的数据
       endAfterConnect: false,

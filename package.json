@@ -1,7 +1,7 @@
 {
   "name": "ws-port-forward",
-  "version": "2.0.0",
-  "description": "以 WebSocket 作为信道的 TCP 端口转发：单文件可执行脚本，access / expose 两种模式",
+  "version": "0.0.1",
+  "description": "以 WebSocket 作为信道的 TCP 端口转发：单文件可执行脚本，expose 声明服务 / access 接入使用，两端都能监听或拨号",
   "private": true,
   "main": "src/cli.js",
   "bin": {
