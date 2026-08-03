@@ -19,7 +19,7 @@ const ws = require('ws');
 
 const { NAME } = require('../buildinfo');
 const { createHttpHandler } = require('../http-routes');
-const { formatHostPort, safeEqual } = require('./util');
+const { formatHostPort, safeEqual, getPublicAddresses } = require('./util');
 
 const WebSocket = ws;
 const { WebSocketServer } = ws;
@@ -123,6 +123,21 @@ function startLink({ opts, log, onPeer, onShutdown }) {
       const q = opts.token && !t.publicHttp ? '?token=你的口令' : '';
       log.info(`服务已启动：ws://${bound}${t.path}（WS） + http://${bound}/（说明与下载）`);
       log.info(`引导对端：curl -fsSL 'http://${opts.publicAuthority}/download${q}' -o ${NAME}`);
+
+      // 异步获取并打印 IP 地址，失败不影响服务运行
+      getPublicAddresses().then(({ ipv6Public, ipv4Public, ipv4Local }) => {
+        const parts = [];
+        if (ipv6Public) parts.push(`IPv6 公网: ${ipv6Public}`);
+        if (ipv4Public) parts.push(`IPv4 公网: ${ipv4Public}`);
+        if (ipv4Local) parts.push(`局域网 IPv4: ${ipv4Local}`);
+        if (parts.length > 0) {
+          log.info(`本机地址：\n${parts.join('\n')}`);
+        } else {
+          log.warn('无法获取本机公网地址（网络可能受限）');
+        }
+      }).catch(() => {
+        // 获取失败不影响服务运行
+      });
     });
     server.on('error', (err) => {
       log.error(`服务无法启动：${err.message}`);

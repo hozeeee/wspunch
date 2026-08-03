@@ -1,5 +1,8 @@
 'use strict';
 
+const https = require('node:https');
+const os = require('node:os');
+
 const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 };
 
 function ts() {
@@ -90,6 +93,61 @@ function safeEqual(a, b) {
   return require('node:crypto').timingSafeEqual(x, y);
 }
 
+/**
+ * 获取本机公网 / 局域网 IP 地址。
+ *
+ * 返回 { ipv6Public, ipv4Public, ipv4Local }，每个字段获取失败时为 null。
+ * 任一地址获取失败不会影响其他地址的获取，也不会抛错。
+ */
+async function getPublicAddresses({ timeoutMs = 5000 } = {}) {
+  /** 用外部服务拿公网 IP，timeout 兜住。 */
+  function fetchText(url) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        req.destroy();
+        reject(new Error('timeout'));
+      }, timeoutMs);
+      const req = https.get(url, { timeout: timeoutMs }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          clearTimeout(timer);
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(data.trim());
+          } else {
+            reject(new Error(`HTTP ${res.statusCode}`));
+          }
+        });
+      });
+      req.on('error', (err) => { clearTimeout(timer); reject(err); });
+    });
+  }
+
+  // 三个地址独立获取，互不影响
+  const [ipv4Public, ipv4Local, ipv6Local] = await Promise.all([
+    // IPv4 公网
+    fetchText('https://api.ipify.org?format=text')
+      .then((ip) => (/^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip : null))
+      .catch(() => null),
+    // 局域网 IPv4（从网卡信息里取第一个非回环的 IPv4）
+    Promise.resolve(
+      Object.values(os.networkInterfaces())
+        .flat()
+        .filter((i) => i && (i.family === 'IPv4' || i.family === 4) && !i.internal)
+        .map((i) => i.address)[0] || null,
+    ),
+    // 局域网 IPv6（从网卡信息里取第一个非回环的 IPv6，优先全局地址）
+    Promise.resolve(
+      Object.values(os.networkInterfaces())
+        .flat()
+        .filter((i) => i && (i.family === 'IPv6' || i.family === 6) && !i.internal)
+        .map((i) => i.address)[0] || null,
+    ),
+  ]);
+
+  return { ipv6Public: ipv6Local, ipv4Public, ipv4Local };
+}
+
 module.exports = {
   createLogger,
   parseHostPort,
@@ -98,4 +156,5 @@ module.exports = {
   parseMapping,
   formatBytes,
   safeEqual,
+  getPublicAddresses,
 };
