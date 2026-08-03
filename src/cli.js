@@ -118,7 +118,7 @@ function parseAccess(argv) {
     options: {
       ...COMMON_OPTIONS,
       map: { type: 'string', multiple: true, default: [] },
-      'listen-host': { type: 'string', default: '127.0.0.1' },
+      'listen-host': { type: 'string', default: '::' },
     },
   });
 
